@@ -70,4 +70,3 @@ If you have research ideas or want to collaborate:
 - **Contact me** for discussion and research collaboration.
 
 🚀 **Enjoy exploring the unknown!**
->>>>>>> Stashed changes
