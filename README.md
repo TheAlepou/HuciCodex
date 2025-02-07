@@ -45,7 +45,7 @@ A collection of simulations modeling **God's existence across universes**:
 
 ## ⚖️ **License & Usage**
 
-This project is licensed under the **VectorSphere Proprietary License**, meaning:
+This project is licensed under the **Huci Codex Proprietary License**, meaning:
 ✅ **Allowed Users**: **Individual researchers, non-profit organizations, and hobbyists**.  
 ❌ **Forbidden Use**: **Military applications, government agencies, corporations, or defense contractors**.  
 
