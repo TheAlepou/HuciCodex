@@ -1,7 +1,7 @@
 clc; clear; close all;
 
 % Create Satellite Scenario (AutoSimulate enabled)
-startTime = datetime("today");
+startTime = datetime("now");
 stopTime = startTime + days(1);  % Simulate for 1 day
 sampleTime = 60;  % 60-second update rate
 scenario = satelliteScenario(startTime, stopTime, sampleTime, 'AutoSimulate', true);
@@ -33,20 +33,23 @@ earthStation_Oradea = groundStation(scenario, ...
     "Name", "Oradea Power Receiver");
 
 % Ensure the directory exists for saving TLE files
-tleFolder = "Universe/Spacecraft and Space Travel/Project MorningStar/data";
+tleFolder = "Project MorningStar/data";
 if ~isfolder(tleFolder)
     mkdir(tleFolder);
 end
 
 % Load the TLE file from Celestrak
 tleFile = fullfile(tleFolder, "starlink_latest.txt");
-websave(tleFile, "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle");
+
+if ~isfile(tleFile), startTime;
+    websave(tleFile, "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle");
+end
 
 % Read the TLE file
 tleData = readlines(tleFile);
 
 % Select specific Starlink satellites (e.g., the first 5 satellites)
-numSatellites = 5;  % Change this number to add more or fewer satellites
+numSatellites = 15;  % Change this number to add more or fewer satellites
 selectedTLE = [];
 
 for i = 1:numSatellites
