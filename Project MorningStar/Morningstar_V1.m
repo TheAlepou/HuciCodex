@@ -5,7 +5,7 @@ clc; clear; close all;
 startTime = datetime("now");
 stopTime = startTime + days(1);   % 1-day simulation
 sampleTime = 60;                  % 60-second update rate
-scenario = satelliteScenario(startTime, stopTime, sampleTime, 'AutoSimulate', false);
+scenario = satelliteScenario(startTime, stopTime, sampleTime, 'AutoSimulate', true);
 
 %% Define Multiple Earth Stations (Power Receivers)
 earthStation_Tokyo = groundStation(scenario, ...
@@ -96,7 +96,6 @@ accessLink_Oradea = access(fusion_satellite, earthStation_Oradea);
 sun = groundStation(scenario, "Latitude", 0, "Longitude", 0, "Name", "Sun Reference", "Altitude", 1.496e11); % Sun's distance
 
 % Open the Viewer (Auto-Simulation will start!)
-viewer = satelliteScenarioViewer(scenario);
 hold off;
 
 %% Display Results
