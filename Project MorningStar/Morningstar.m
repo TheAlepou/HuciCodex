@@ -27,6 +27,11 @@ earthStation_Sydney = groundStation(scenario, ...
     "Longitude", 151.2093, ...
     "Name", "Sydney Power Receiver");
 
+earthStation_Oradea = groundStation(scenario, ...
+    "Latitude", 47.06667, ...
+    "Longitude", 21.93333, ...
+    "Name", "Oradea Power Receiver");
+
 % Ensure the directory exists for saving TLE files
 tleFolder = "Universe/Spacecraft and Space Travel/Project MorningStar/data";
 if ~isfolder(tleFolder)
@@ -61,6 +66,7 @@ accessLink_Tokyo = access(sat, earthStation_Tokyo);
 accessLink_NewYork = access(sat, earthStation_NewYork);
 accessLink_London = access(sat, earthStation_London);
 accessLink_Sydney = access(sat, earthStation_Sydney);
+accessLink_Oradea = access(sat, earthStation_Oradea);
 
 % Solar Panel Simulation - Sun Tracking
 sun = groundStation(scenario, "Latitude", 0, "Longitude", 0, "Name", "Sun Reference", "Altitude", 1.496e11); % Sun's distance
