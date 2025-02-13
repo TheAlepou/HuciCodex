@@ -41,6 +41,8 @@ end
 % Load the TLE file from Celestrak
 tleFile = fullfile(tleFolder, "starlink_latest.txt");
 
+% If the TLE file from Celestrak is outdated or doesn't exist, create the
+% file. This is what this part does, essentially
 if ~isfile(tleFile), startTime;
     websave(tleFile, "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle");
 end
