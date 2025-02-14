@@ -47,6 +47,7 @@ for i = 1:numSatellites
     end
 end
 
+
 %% Establish Access Links Dynamically (Ensuring All Satellites Have a Line)
 
 pause(1); % Adds a small delay to allow MATLAB to process objects properly
@@ -57,7 +58,7 @@ accessLinks = struct();
 % Set a larger laser range (modify as needed)
 maxLaserRange = 15000e3;  % 15,000 km (increase if needed)
 
-
+% Check distance of Earth Stations
 for s = 1:numel(satelliteArray)
     for g = 1:numel(earthStations)
         satPos = states(satelliteArray(s)); % Get satellite position
@@ -74,6 +75,7 @@ if ~exist('accessLinks', 'var') || ~isstruct(accessLinks)
     accessLinks = struct();
 end
 
+% Check links between Earth's Power Receivers and the Satellites
 for s = 1:numel(satelliteArray)
     minDist = inf;
     closestGS = [];
@@ -124,6 +126,7 @@ for s = 1:numel(satelliteArray)
     end
 end
 
+% Check distance and satellite positions
 for s = 1:numel(satelliteArray)
     validReceivers = [];  % Reset valid receivers list
     
@@ -244,7 +247,69 @@ for i = 1:numSatellites
     fprintf('  Fusion Gain Factor (Q): %.2f\n\n', Q);
 end
 
-%% Force Viewer to Refresh
+%% Visualize Mini-Fusion Reactor
+
+% Initialize a struct to hold fusion data for each satellite
+fusionData = struct();
+
+% Assign energy parameters to each satellite
+for i = 1:numel(satelliteArray)
+    satName = matlab.lang.makeValidName(satelliteArray(i).Name); % Ensure it's a valid field name
+    fusionData.(satName).FusionPower = reactorParams(i).P_fusion;
+    fusionData.(satName).TransmitPower = reactorParams(i).P_transmit;
+    fusionData.(satName).BatteryCharge = 100; % Example: 100% charge at start
+end
+
+% Assign energy decay after certain distance
+for i = 1:numel(satelliteArray)
+    satName = matlab.lang.makeValidName(satelliteArray(i).Name); % Get satellite name
+    
+    for j = 1:numel(earthStations)
+        gsPos = [earthStations(j).Latitude, earthStations(j).Longitude, 0];
+        satPos = states(satelliteArray(i)); % Get satellite position
+        
+        % Calculate distance
+        dist = norm(satPos(1:3) - lla2ecef(gsPos));
+        efficiencyLoss = exp(-dist / 5000); % Example decay function
+        
+        % Update power transmission
+        fusionData.(satName).TransmitPower = fusionData.(satName).FusionPower * efficiencyLoss;
+    end
+end
+
+% Define overheat threshold
+overheatThreshold = 600e6; % 600 MW
+
+% Loop through satellites to check for overheating
+for i = numel(satelliteArray):-1:1  % Iterate in reverse to avoid index shifting
+    satName = matlab.lang.makeValidName(satelliteArray(i).Name);
+    
+    if fusionData.(satName).FusionPower > overheatThreshold
+        % 🚨 Set the satellite as "destroyed"
+        fusionData.(satName).TransmitPower = 0;
+        fprintf('⚠️ WARNING: %s Reactor Overheated! Transmission Halted.\n', satName);
+
+        % 🔥 Delete the access link first (if it exists)
+        if isfield(accessLinks, satName)
+            if isvalid(accessLinks.(satName))
+                delete(accessLinks.(satName));  % Remove the link
+                accessLinks = rmfield(accessLinks, satName);
+                fprintf('🛑 Access link for %s has been destroyed due to overheating.\n', satName);
+            end
+        end
+        
+        % 💥 Destroy the satellite itself
+        try
+            delete(satelliteArray(i));  % Remove satellite from the scenario
+            satelliteArray(i) = [];  % Remove from the array
+            fprintf('🚀 %s has been DESTROYED and is now out of orbit.\n', satName);
+        catch ME
+            fprintf('⚠️ Failed to delete %s: %s\n', satName, ME.message);
+        end
+    end
+end
+
+% Force MATLAB to refresh the scenario
 drawnow;
-disp('Refreshing scenario...'); 
-play(scenario); % Forces MATLAB to update the scenario and rerun access computations
+disp('♻️ Scenario updated after handling overheating failures.');
+play(scenario);
