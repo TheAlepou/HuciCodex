@@ -48,24 +48,148 @@ for i = 1:numSatellites
 end
 
 %% Establish Access Links Dynamically (Ensuring All Satellites Have a Line)
-accessLinks = cell(numSatellites, numel(earthStations));
 
+pause(1); % Adds a small delay to allow MATLAB to process objects properly
+
+clear accessLinks; % This ensures a clean slate
+accessLinks = struct();
+
+% Set a larger laser range (modify as needed)
+maxLaserRange = 15000e3;  % 15,000 km (increase if needed)
+
+
+for s = 1:numel(satelliteArray)
+    for g = 1:numel(earthStations)
+        satPos = states(satelliteArray(s)); % Get satellite position
+        gsPos = [earthStations(g).Latitude, earthStations(g).Longitude, 0];
+
+        dist = norm(satPos(1:3) - lla2ecef(gsPos));
+        fprintf('Checking %s -> %s, Distance: %.2f km\n', ...
+            satelliteArray(s).Name, earthStations(g).Name, dist/1000);
+    end
+end
+
+% Ensure the struct exists
+if ~exist('accessLinks', 'var') || ~isstruct(accessLinks)
+    accessLinks = struct();
+end
+
+for s = 1:numel(satelliteArray)
+    minDist = inf;
+    closestGS = [];
+
+    for g = 1:numel(earthStations)
+        gsPos = [earthStations(g).Latitude, earthStations(g).Longitude, 0];
+        satPos = states(satelliteArray(s));
+
+        dist = norm(satPos(1:3) - lla2ecef(gsPos));
+
+        fprintf('Checking %s -> %s, Distance: %.2f km\n', ...
+            satelliteArray(s).Name, earthStations(g).Name, dist/1000);
+
+        % Instead of taking the absolute closest, check if it is within range
+        if dist < minDist && dist < maxLaserRange  % Increase max allowed distance
+            minDist = dist;
+            closestGS = earthStations(g);
+        end
+    end
+
+    if ~isempty(closestGS)
+        try
+            fixedFieldName = matlab.lang.makeValidName(satelliteArray(s).Name);
+
+            % Delete previous access object if it exists
+            if isfield(accessLinks, fixedFieldName)
+                if isvalid(accessLinks.(fixedFieldName))
+                    delete(accessLinks.(fixedFieldName));
+                end
+                accessLinks = rmfield(accessLinks, fixedFieldName);
+            end
+
+            % Create a new access object
+            newAccessLink = access(satelliteArray(s), closestGS);
+
+            if isvalid(newAccessLink)
+                accessLinks.(fixedFieldName) = newAccessLink;
+                fprintf('✅ Access link created for %s to %s\n', satelliteArray(s).Name, closestGS.Name);
+            else
+                fprintf('❌ Failed to create valid access link for %s\n', satelliteArray(s).Name);
+            end
+
+        catch ME
+            fprintf('⚠️ Error creating access link for %s: %s\n', satelliteArray(s).Name, ME.message);
+        end
+    else
+        fprintf('🚨 No valid power receiver found within %.0f km for %s\n', maxLaserRange/1000, satelliteArray(s).Name);
+    end
+end
+
+for s = 1:numel(satelliteArray)
+    validReceivers = [];  % Reset valid receivers list
+    
+    % Find all ground stations within range
+    for g = 1:numel(earthStations)
+        gsPos = [earthStations(g).Latitude, earthStations(g).Longitude, 0];
+        satPos = states(satelliteArray(s));  % Get satellite position
+
+        dist = norm(satPos(1:3) - lla2ecef(gsPos));
+
+        if dist < maxLaserRange
+            validReceivers = [validReceivers, earthStations(g)]; % Add station to valid list
+        end
+    end  
+
+    % Allow multiple connections instead of just one
+    if ~isempty(validReceivers)
+        for g = 1:numel(validReceivers)
+            try
+                accessLinks(s, g) = access(satelliteArray(s), validReceivers(g));
+                fprintf('Access link created for %s to %s\n', ...
+                        satelliteArray(s).Name, validReceivers(g).Name);
+            catch ME
+                fprintf('Failed to create access link for %s to %s: %s\n', ...
+                        satelliteArray(s).Name, validReceivers(g).Name, ME.message);
+            end
+        end
+    else
+        fprintf('⚠️ No valid receivers found for %s\n', satelliteArray(s).Name);
+    end
+end
+
+%% Debugging
 for s = 1:numel(satelliteArray)
     minDist = inf;
     closestGS = [];
     
     for g = 1:numel(earthStations)
         gsPos = [earthStations(g).Latitude, earthStations(g).Longitude, 0];
-        satPos = states(satelliteArray(s));
+        satPos = states(satelliteArray(s)); % Get current satellite position
+        
         dist = norm(satPos(1:3) - lla2ecef(gsPos));
+
+        fprintf('Distance from %s to %s: %.2f km\n', satelliteArray(s).Name, earthStations(g).Name, dist/1000);
+        
         if dist < minDist
             minDist = dist;
             closestGS = earthStations(g);
         end
     end
     
+    fprintf('Closest station to %s is %s at %.2f km\n', satelliteArray(s).Name, closestGS.Name, minDist/1000);
+    
     if ~isempty(closestGS)
-        accessLinks{s, g} = access(satelliteArray(s), closestGS);
+        try
+            accessLinks(s) = access(satelliteArray(s), closestGS);
+            fprintf('Access link created for %s to %s\n', satelliteArray(s).Name, closestGS.Name);
+        catch ME
+            fprintf('Failed to create access link for %s: %s\n', satelliteArray(s).Name, ME.message);
+        end
+    end
+end
+
+for s = 1:numel(satelliteArray)
+    if ~isfield(accessLinks, matlab.lang.makeValidName(satelliteArray(s).Name))
+        fprintf('WARNING: %s has NO access link assigned!\n', satelliteArray(s).Name);
     end
 end
 
@@ -79,7 +203,38 @@ tau_energy = 3;             % Energy confinement time in seconds
 Q = (n_plasma * T_plasma * tau_energy) / (1e28);  % Lawson Criterion (fusion gain factor)
 
 %% Print Fusion Parameters for Each Satellite
-for i = 1:numel(satelliteArray)
+% Base values
+P_fusion_base = 500e6;  % Base power output in watts (500 MW)
+efficiency_base = 0.40; % Base efficiency (40%)
+T_plasma_base = 150e6;  % Base plasma temperature in Kelvin
+n_plasma_base = 1e20;   % Base plasma density (particles per m^3)
+tau_energy_base = 3;    % Base energy confinement time in seconds
+
+% Generate realistic deviations per satellite
+reactorParams = struct([]);
+
+for i = 1:numSatellites
+    % Random variations within ±5%
+    P_fusion = P_fusion_base * (0.95 + 0.1 * rand());
+    efficiency = efficiency_base * (0.95 + 0.05 * rand());
+    P_transmit = P_fusion * efficiency;
+
+    T_plasma = T_plasma_base * (0.98 + 0.04 * rand());
+    n_plasma = n_plasma_base * (0.97 + 0.06 * rand());
+    tau_energy = tau_energy_base * (0.95 + 0.07 * rand());
+
+    % Compute the Fusion Gain Factor (Q)
+    Q = (n_plasma * T_plasma * tau_energy) / (1e28);
+
+    % Store parameters for this satellite
+    reactorParams(i).P_fusion = P_fusion;
+    reactorParams(i).P_transmit = P_transmit;
+    reactorParams(i).T_plasma = T_plasma;
+    reactorParams(i).n_plasma = n_plasma;
+    reactorParams(i).tau_energy = tau_energy;
+    reactorParams(i).Q = Q;
+    
+    % Print the parameters
     fprintf('Satellite %d - %s:\n', i, satelliteArray(i).Name);
     fprintf('  Fusion Reactor Output: %.2f MW\n', P_fusion / 1e6);
     fprintf('  Transmitted Power: %.2f MW\n', P_transmit / 1e6);
@@ -91,3 +246,5 @@ end
 
 %% Force Viewer to Refresh
 drawnow;
+disp('Refreshing scenario...'); 
+play(scenario); % Forces MATLAB to update the scenario and rerun access computations
