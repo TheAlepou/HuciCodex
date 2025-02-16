@@ -28,7 +28,7 @@ net = configure(net, trainingData, targetData); % Configure with input/target si
 net = train(net, trainingData, targetData);
 
 % AI-Based Energy Collection
-timeSteps = 100;
+timeSteps = 1000;
 optimizedEnergyOutput = zeros(timeSteps,1);
 
 for t = 1:timeSteps
